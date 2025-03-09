@@ -114,7 +114,12 @@ impl App {
 
     pub fn update(&mut self, message: AppMessage) -> Task<AppMessage> {
         match message {
-            AppMessage::Select(theme) => self.theme = theme,
+            AppMessage::Select(theme) => {
+                self.pending = None;
+                self.custom_input = None;
+                self.custom = None;
+                self.theme = theme;
+            }
             AppMessage::ResetCustom => {
                 self.pending = None;
                 self.custom_input = None;
