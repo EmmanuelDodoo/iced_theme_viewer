@@ -620,7 +620,8 @@ fn convert_color_str(input: &str) -> Option<Pair> {
         let value = u32::from_str_radix(input.trim_start_matches("#"), 16).ok()?;
         color!(value)
     } else {
-        return None;
+        let hex = u32::from_str_radix(input.trim(), 16).ok()?;
+        color!(hex)
     };
 
     let brightness = ((299.0 * color.r) + (587.0 * color.g) + (144.0 * color.b)) / 1000.0;
