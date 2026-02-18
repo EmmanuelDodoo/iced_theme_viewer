@@ -1,5 +1,5 @@
 use iced::{
-    Background, Border, Length, Task, Theme,
+    Background, Border, Color, Length, Task, Theme,
     alignment::{Horizontal, Vertical},
     color,
     theme::{
@@ -10,6 +10,7 @@ use iced::{
     widget::{
         self, Container, Row, TextInput,
         container::{self},
+        space,
     },
 };
 use std::sync::Arc;
@@ -101,6 +102,10 @@ fn my_text<'a, M>(text: &'a str) -> Container<'a, M> {
 }
 
 impl App {
+    pub fn boot() -> (Self, Task<AppMessage>) {
+        (Self::new(), Task::none())
+    }
+
     pub fn new() -> Self {
         Self {
             theme: Theme::Light,
@@ -198,13 +203,13 @@ impl App {
         let spacing = 16.0;
 
         let labels = widget::row!(
-            widget::horizontal_space().width(155),
+            space::horizontal().width(155),
             my_text("Base"),
-            widget::horizontal_space().width(145),
+            space::horizontal().width(145),
             my_text("Weak"),
-            widget::horizontal_space().width(135),
+            space::horizontal().width(135),
             my_text("Strong"),
-            widget::horizontal_space().width(155),
+            space::horizontal().width(155),
         )
         .align_y(Vertical::Center)
         .spacing(0);
@@ -256,7 +261,7 @@ impl App {
             header,
             theme_selector,
             content,
-            widget::vertical_space().height(25.0),
+            space::vertical().height(25.0),
             reset
         ]
         .align_x(Horizontal::Center)
@@ -572,16 +577,14 @@ impl App {
 }
 
 fn main() -> iced::Result {
-    iced::application("App", App::update, App::view)
+    iced::application(App::boot, App::update, App::view)
+        .title("Theme Viewer")
         .antialiasing(true)
         .window_size((720.0, 720.0))
         .resizable(false)
         .theme(theme)
         .subscription(App::subscription)
-        .run_with(|| {
-            let state = App::new();
-            (state, iced::Task::none())
-        })
+        .run()
 }
 
 fn theme(app: &App) -> Theme {
@@ -623,10 +626,12 @@ fn convert_color_str(input: &str) -> Option<Pair> {
         color!(values[0], values[1], values[2])
     } else if input.contains("#") {
         let value = u32::from_str_radix(input.trim_start_matches("#"), 16).ok()?;
-        color!(value)
+        let [r, g, b, a] = value.to_be_bytes();
+        Color::from_rgba8(r, g, b, a as f32)
     } else {
         let hex = u32::from_str_radix(input.trim(), 16).ok()?;
-        color!(hex)
+        let [r, g, b, a] = hex.to_be_bytes();
+        Color::from_rgba8(r, g, b, a as f32)
     };
 
     let brightness = ((299.0 * color.r) + (587.0 * color.g) + (144.0 * color.b)) / 1000.0;
