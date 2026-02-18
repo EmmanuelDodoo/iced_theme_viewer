@@ -17,8 +17,9 @@ use std::sync::Arc;
 
 #[derive(Debug)]
 struct App {
-    theme: Theme,
+    theme: usize,
     themes: Vec<Theme>,
+    custom_count: u8,
     custom: Option<Theme>,
     custom_input: Option<String>,
     last_change: Instant,
@@ -29,15 +30,22 @@ struct App {
 enum AppMessage {
     Select(Theme),
     ResetCustom,
+    SaveCustom,
     ApplyCustom,
     Tick,
-    Action(String, Usage, Variant),
+    Action {
+        value: String,
+        usage: Usage,
+        variant: Variant,
+        text: bool,
+    },
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 struct Pending {
     usage: Usage,
     variant: Variant,
+    text: bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -108,8 +116,9 @@ impl App {
 
     pub fn new() -> Self {
         Self {
-            theme: Theme::Light,
+            theme: 0,
             themes: all_themes(),
+            custom_count: 0,
             custom: None,
             custom_input: None,
             pending: None,
@@ -123,12 +132,29 @@ impl App {
                 self.pending = None;
                 self.custom_input = None;
                 self.custom = None;
-                self.theme = theme;
+                self.theme = self
+                    .themes
+                    .iter()
+                    .enumerate()
+                    .find_map(|(idx, th)| (*th == theme).then_some(idx))
+                    .unwrap_or_default();
             }
             AppMessage::ResetCustom => {
                 self.pending = None;
                 self.custom_input = None;
                 self.custom = None;
+            }
+            AppMessage::SaveCustom => {
+                self.apply_custom();
+
+                if let Some(custom) = self.custom.take() {
+                    self.pending = None;
+                    self.custom_input = None;
+                    self.custom_count += 1;
+
+                    self.theme = self.themes.len();
+                    self.themes.push(custom);
+                }
             }
             AppMessage::Tick => {
                 if self.last_change.elapsed() >= Duration::from_millis(750) {
@@ -140,12 +166,21 @@ impl App {
                     self.apply_custom()
                 }
             }
-            AppMessage::Action(input, usage, variant) => {
+            AppMessage::Action {
+                value,
+                usage,
+                variant,
+                text,
+            } => {
                 self.last_change = Instant::now();
 
-                self.custom_input = Some(input);
+                self.custom_input = Some(value);
 
-                self.pending = Some(Pending { usage, variant });
+                self.pending = Some(Pending {
+                    usage,
+                    variant,
+                    text,
+                });
             }
         }
 
@@ -162,19 +197,29 @@ impl App {
             return;
         };
 
-        let Some(Pending { usage, variant }) = self.pending.take() else {
+        let Some(Pending {
+            usage,
+            variant,
+            text: _text,
+        }) = self.pending.take()
+        else {
             return;
         };
 
-        let ext = *self.custom.as_ref().map_or_else(
-            || self.theme.extended_palette(),
-            |theme| theme.extended_palette(),
-        );
+        let default_ext = self.themes.get(self.theme).unwrap().extended_palette();
+
+        let ext = *self
+            .custom
+            .as_ref()
+            .map_or(default_ext, |theme| theme.extended_palette());
 
         let ext = updated_extended(ext, pair, usage, variant);
 
-        let custom =
-            theme::Custom::with_fn("Custom".to_owned(), theme::Palette::DARK, move |_| ext);
+        let custom = theme::Custom::with_fn(
+            format!("Custom {}", self.custom_count),
+            theme::Palette::DARK,
+            move |_| ext,
+        );
 
         let custom = Theme::Custom(Arc::new(custom));
 
@@ -186,16 +231,19 @@ impl App {
     }
 
     pub fn view(&self) -> iced::Element<'_, AppMessage> {
-        let theme = self.custom.as_ref().unwrap_or(&self.theme);
+        let theme = self
+            .custom
+            .as_ref()
+            .unwrap_or(self.themes.get(self.theme).unwrap());
 
-        let header = widget::text("Default Themes")
+        let header = widget::text("Themes")
             .size(32.0)
             .center()
             .width(Length::Fill);
 
         let theme_selector = widget::container(widget::pick_list(
-            self.themes.clone(),
-            Some(self.theme.clone()),
+            self.themes.as_slice(),
+            self.themes.get(self.theme),
             AppMessage::Select,
         ))
         .center_x(Length::Fill);
@@ -250,19 +298,22 @@ impl App {
 
         let content = widget::column!(labels, colors);
 
-        let btn_message = if self.custom.is_some() {
-            Some(AppMessage::ResetCustom)
-        } else {
-            None
-        };
-        let reset = widget::button("Reset Custom").on_press_maybe(btn_message);
+        let reset = widget::button("Reset Custom")
+            .on_press_maybe(self.custom.is_some().then_some(AppMessage::ResetCustom));
+
+        let save = widget::button("Save custom")
+            .on_press_maybe(self.custom.is_some().then_some(AppMessage::SaveCustom));
+
+        let actions = widget::row!(reset, save)
+            .spacing(40)
+            .align_y(iced::alignment::Vertical::Center);
 
         widget::column![
             header,
             theme_selector,
             content,
             space::vertical().height(25.0),
-            reset
+            actions
         ]
         .align_x(Horizontal::Center)
         .spacing(spacing)
@@ -279,6 +330,7 @@ impl App {
                 Some(Pending {
                     usage: pending_usage,
                     variant: pending_variant,
+                    text,
                 }) if usage == pending_usage && variant == pending_variant => self
                     .custom_input
                     .clone()
@@ -288,7 +340,7 @@ impl App {
 
             let content = widget::text_input("rgb or hex", &value);
 
-            text_input(content, usage, variant)
+            text_input(content, usage, variant, false)
         };
 
         let weak = {
@@ -297,6 +349,7 @@ impl App {
                 Some(Pending {
                     usage: pending_usage,
                     variant: pending_variant,
+                    text,
                 }) if usage == pending_usage && variant == pending_variant => self
                     .custom_input
                     .clone()
@@ -306,7 +359,7 @@ impl App {
 
             let content = widget::text_input("rgb or hex", &value);
 
-            text_input(content, usage, variant)
+            text_input(content, usage, variant, false)
         };
 
         let strong = {
@@ -315,6 +368,7 @@ impl App {
                 Some(Pending {
                     usage: pending_usage,
                     variant: pending_variant,
+                    text,
                 }) if usage == pending_usage && variant == pending_variant => self
                     .custom_input
                     .clone()
@@ -324,7 +378,7 @@ impl App {
 
             let content = widget::text_input("rgb or hex", &value);
 
-            text_input(content, usage, variant)
+            text_input(content, usage, variant, false)
         };
 
         widget::row!(
@@ -344,6 +398,7 @@ impl App {
                 Some(Pending {
                     usage: pending_usage,
                     variant: pending_variant,
+                    text,
                 }) if usage == pending_usage && variant == pending_variant => self
                     .custom_input
                     .clone()
@@ -353,7 +408,7 @@ impl App {
 
             let content = widget::text_input("rgb or hex", &value);
 
-            text_input(content, usage, variant)
+            text_input(content, usage, variant, false)
         };
 
         let weak = {
@@ -362,6 +417,7 @@ impl App {
                 Some(Pending {
                     usage: pending_usage,
                     variant: pending_variant,
+                    text,
                 }) if usage == pending_usage && variant == pending_variant => self
                     .custom_input
                     .clone()
@@ -371,7 +427,7 @@ impl App {
 
             let content = widget::text_input("rgb or hex", &value);
 
-            text_input(content, usage, variant)
+            text_input(content, usage, variant, false)
         };
 
         let strong = {
@@ -380,6 +436,7 @@ impl App {
                 Some(Pending {
                     usage: pending_usage,
                     variant: pending_variant,
+                    text,
                 }) if usage == pending_usage && variant == pending_variant => self
                     .custom_input
                     .clone()
@@ -389,7 +446,7 @@ impl App {
 
             let content = widget::text_input("rgb or hex", &value);
 
-            text_input(content, usage, variant)
+            text_input(content, usage, variant, false)
         };
 
         widget::row!(my_text("Primary").width(Length::Fill), base, weak, strong)
@@ -404,6 +461,7 @@ impl App {
                 Some(Pending {
                     usage: pending_usage,
                     variant: pending_variant,
+                    text,
                 }) if usage == pending_usage && variant == pending_variant => self
                     .custom_input
                     .clone()
@@ -413,7 +471,7 @@ impl App {
 
             let content = widget::text_input("rgb or hex", &value);
 
-            text_input(content, usage, variant)
+            text_input(content, usage, variant, false)
         };
 
         let weak = {
@@ -422,6 +480,7 @@ impl App {
                 Some(Pending {
                     usage: pending_usage,
                     variant: pending_variant,
+                    text,
                 }) if usage == pending_usage && variant == pending_variant => self
                     .custom_input
                     .clone()
@@ -431,7 +490,7 @@ impl App {
 
             let content = widget::text_input("rgb or hex", &value);
 
-            text_input(content, usage, variant)
+            text_input(content, usage, variant, false)
         };
 
         let strong = {
@@ -440,6 +499,7 @@ impl App {
                 Some(Pending {
                     usage: pending_usage,
                     variant: pending_variant,
+                    text,
                 }) if usage == pending_usage && variant == pending_variant => self
                     .custom_input
                     .clone()
@@ -449,7 +509,7 @@ impl App {
 
             let content = widget::text_input("rgb or hex", &value);
 
-            text_input(content, usage, variant)
+            text_input(content, usage, variant, false)
         };
 
         widget::row!(my_text("Secondary").width(Length::Fill), base, weak, strong)
@@ -464,6 +524,7 @@ impl App {
                 Some(Pending {
                     usage: pending_usage,
                     variant: pending_variant,
+                    text,
                 }) if usage == pending_usage && variant == pending_variant => self
                     .custom_input
                     .clone()
@@ -473,7 +534,7 @@ impl App {
 
             let content = widget::text_input("rgb or hex", &value);
 
-            text_input(content, usage, variant)
+            text_input(content, usage, variant, false)
         };
 
         let weak = {
@@ -482,6 +543,7 @@ impl App {
                 Some(Pending {
                     usage: pending_usage,
                     variant: pending_variant,
+                    text,
                 }) if usage == pending_usage && variant == pending_variant => self
                     .custom_input
                     .clone()
@@ -491,7 +553,7 @@ impl App {
 
             let content = widget::text_input("rgb or hex", &value);
 
-            text_input(content, usage, variant)
+            text_input(content, usage, variant, false)
         };
 
         let strong = {
@@ -500,6 +562,7 @@ impl App {
                 Some(Pending {
                     usage: pending_usage,
                     variant: pending_variant,
+                    text,
                 }) if usage == pending_usage && variant == pending_variant => self
                     .custom_input
                     .clone()
@@ -509,7 +572,7 @@ impl App {
 
             let content = widget::text_input("rgb or hex", &value);
 
-            text_input(content, usage, variant)
+            text_input(content, usage, variant, false)
         };
 
         widget::row!(my_text("Success").width(Length::Fill), base, weak, strong)
@@ -524,6 +587,7 @@ impl App {
                 Some(Pending {
                     usage: pending_usage,
                     variant: pending_variant,
+                    text,
                 }) if usage == pending_usage && variant == pending_variant => self
                     .custom_input
                     .clone()
@@ -533,7 +597,7 @@ impl App {
 
             let content = widget::text_input("rgb or hex", &value);
 
-            text_input(content, usage, variant)
+            text_input(content, usage, variant, false)
         };
 
         let weak = {
@@ -542,6 +606,7 @@ impl App {
                 Some(Pending {
                     usage: pending_usage,
                     variant: pending_variant,
+                    text,
                 }) if usage == pending_usage && variant == pending_variant => self
                     .custom_input
                     .clone()
@@ -551,7 +616,7 @@ impl App {
 
             let content = widget::text_input("rgb or hex", &value);
 
-            text_input(content, usage, variant)
+            text_input(content, usage, variant, false)
         };
 
         let strong = {
@@ -560,6 +625,7 @@ impl App {
                 Some(Pending {
                     usage: pending_usage,
                     variant: pending_variant,
+                    text,
                 }) if usage == pending_usage && variant == pending_variant => self
                     .custom_input
                     .clone()
@@ -569,7 +635,7 @@ impl App {
 
             let content = widget::text_input("rgb or hex", &value);
 
-            text_input(content, usage, variant)
+            text_input(content, usage, variant, false)
         };
 
         widget::row!(my_text("Danger").width(Length::Fill), base, weak, strong)
@@ -588,16 +654,24 @@ fn main() -> iced::Result {
 }
 
 fn theme(app: &App) -> Theme {
-    app.custom.clone().unwrap_or_else(|| app.theme.clone())
+    app.custom
+        .clone()
+        .unwrap_or_else(|| app.themes.get(app.theme).cloned().unwrap())
 }
 
 fn text_input(
     input: TextInput<'_, AppMessage>,
     usage: Usage,
     variant: Variant,
+    text: bool,
 ) -> widget::TextInput<'_, AppMessage> {
     input
-        .on_input(move |input| AppMessage::Action(input, usage, variant))
+        .on_input(move |value| AppMessage::Action {
+            value,
+            usage,
+            variant,
+            text,
+        })
         .on_submit(AppMessage::ApplyCustom)
         .width(168.0)
         .padding([10, 8])
