@@ -31,6 +31,7 @@ enum AppMessage {
     Select(Theme),
     ResetCustom,
     SaveCustom,
+    Print,
     ApplyCustom,
     Tick,
     Action {
@@ -166,6 +167,11 @@ impl App {
                     self.apply_custom()
                 }
             }
+            AppMessage::Print => {
+                let current = theme(&self);
+
+                println!("{:#?}", current.extended_palette());
+            }
             AppMessage::Action {
                 value,
                 usage,
@@ -272,7 +278,7 @@ impl App {
         let spacing = 16.0;
 
         let labels = widget::row!(
-            space::horizontal().width(155),
+            space::horizontal().width(450),
             my_text("Base"),
             space::horizontal().width(145),
             my_text("Weak"),
@@ -315,7 +321,7 @@ impl App {
             success_row,
             danger_row
         )
-        .spacing(spacing);
+        .spacing(24.0);
 
         let content = widget::column!(labels, colors);
 
@@ -325,7 +331,9 @@ impl App {
         let save = widget::button("Save custom")
             .on_press_maybe(self.custom.is_some().then_some(AppMessage::SaveCustom));
 
-        let actions = widget::row!(reset, save)
+        let print = widget::button("Print").on_press(AppMessage::Print);
+
+        let actions = widget::row!(reset, save, print)
             .spacing(40)
             .align_y(iced::alignment::Vertical::Center);
 
@@ -504,7 +512,7 @@ fn main() -> iced::Result {
     iced::application(App::boot, App::update, App::view)
         .title("Theme Viewer")
         .antialiasing(true)
-        .window_size((850.0, 850.0))
+        .window_size((1000.0, 900.0))
         .resizable(false)
         .theme(theme)
         .subscription(App::subscription)
