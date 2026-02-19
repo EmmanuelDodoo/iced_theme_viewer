@@ -58,6 +58,7 @@ enum Variant {
     Strong,
     Stronger,
     Strongest,
+    Neutral,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -226,6 +227,7 @@ impl App {
             (Usage::Background, Variant::Strong) => ext.background.strong,
             (Usage::Background, Variant::Stronger) => ext.background.stronger,
             (Usage::Background, Variant::Strongest) => ext.background.strongest,
+            (Usage::Background, Variant::Neutral) => ext.background.neutral,
 
             (Usage::Primary, Variant::Base) => ext.primary.base,
             (Usage::Primary, Variant::Weak) => ext.primary.weak,
@@ -307,6 +309,8 @@ impl App {
             my_text("Stronger"),
             space::horizontal().width(125),
             my_text("Strongest"),
+            space::horizontal().width(100),
+            my_text("Neutral"),
             space::horizontal().width(150),
         )
         .align_y(Vertical::Center)
@@ -457,6 +461,12 @@ impl App {
             self.helper(usage, variant, theme)
         };
 
+        let neutral = {
+            let variant = Variant::Neutral;
+
+            self.helper(usage, variant, theme)
+        };
+
         widget::row!(
             my_text("Background").width(150),
             base,
@@ -466,6 +476,7 @@ impl App {
             weakest,
             stronger,
             strongest,
+            neutral,
         )
     }
 
@@ -594,7 +605,10 @@ fn main() -> iced::Result {
     iced::application(App::boot, App::update, App::view)
         .title("Theme Viewer")
         .antialiasing(true)
-        .window_size((1500.0, 900.0))
+        .window(iced::window::Settings {
+            maximized: true,
+            ..Default::default()
+        })
         .theme(theme)
         .subscription(App::subscription)
         .run()
@@ -724,6 +738,7 @@ fn get_pair(theme: &Theme, usage: Usage, variant: Variant) -> Pair {
                 Variant::Strong => background.strong,
                 Variant::Stronger => background.stronger,
                 Variant::Strongest => background.strongest,
+                Variant::Neutral => background.neutral,
             }
         }
         Usage::Danger => {
@@ -856,6 +871,10 @@ fn updated_extended(extended: Extended, pair: Pair, usage: Usage, variant: Varia
                 },
                 Variant::Strongest => Background {
                     strongest: pair,
+                    ..extended.background
+                },
+                Variant::Neutral => Background {
+                    neutral: pair,
                     ..extended.background
                 },
             };
