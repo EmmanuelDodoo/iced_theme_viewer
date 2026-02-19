@@ -8,7 +8,7 @@ use iced::{
     },
     time::{Duration, Instant},
     widget::{
-        self, Container, Row, TextInput,
+        self, Container, Row, TextInput, column,
         container::{self},
         space,
     },
@@ -192,26 +192,47 @@ impl App {
             return;
         };
 
-        let Some(pair) = convert_color_str(&input) else {
-            self.custom_input = Some(input);
-            return;
-        };
-
         let Some(Pending {
             usage,
             variant,
-            text: _text,
+            text,
         }) = self.pending.take()
         else {
             return;
         };
-
         let default_ext = self.themes.get(self.theme).unwrap().extended_palette();
 
         let ext = *self
             .custom
             .as_ref()
             .map_or(default_ext, |theme| theme.extended_palette());
+
+        let pair = match (usage, variant) {
+            (Usage::Background, Variant::Base) => ext.background.base,
+            (Usage::Background, Variant::Weak) => ext.background.weak,
+            (Usage::Background, Variant::Strong) => ext.background.strong,
+
+            (Usage::Primary, Variant::Base) => ext.primary.base,
+            (Usage::Primary, Variant::Weak) => ext.primary.weak,
+            (Usage::Primary, Variant::Strong) => ext.primary.strong,
+
+            (Usage::Secondary, Variant::Base) => ext.secondary.base,
+            (Usage::Secondary, Variant::Weak) => ext.secondary.weak,
+            (Usage::Secondary, Variant::Strong) => ext.secondary.strong,
+
+            (Usage::Success, Variant::Base) => ext.success.base,
+            (Usage::Success, Variant::Weak) => ext.success.weak,
+            (Usage::Success, Variant::Strong) => ext.success.strong,
+
+            (Usage::Danger, Variant::Base) => ext.danger.base,
+            (Usage::Danger, Variant::Weak) => ext.danger.weak,
+            (Usage::Danger, Variant::Strong) => ext.danger.strong,
+        };
+
+        let Some(pair) = convert_color_str(&input, pair, text) else {
+            self.custom_input = Some(input);
+            return;
+        };
 
         let ext = updated_extended(ext, pair, usage, variant);
 
@@ -321,64 +342,57 @@ impl App {
         .into()
     }
 
+    fn helper(
+        &self,
+        usage: Usage,
+        variant: Variant,
+        theme: &Theme,
+    ) -> widget::Column<'_, AppMessage> {
+        let (color, text_color) = theme_str(theme, usage, variant);
+
+        let (color, text) = match self.pending {
+            Some(Pending {
+                usage: pending_usage,
+                variant: pending_variant,
+                text,
+            }) if usage == pending_usage && variant == pending_variant => {
+                if text {
+                    (&color, self.custom_input.as_ref().unwrap_or(&text_color))
+                } else {
+                    (self.custom_input.as_ref().unwrap_or(&color), &text_color)
+                }
+            }
+            _ => (&color, &text_color),
+        };
+
+        let color = widget::text_input("rgb or hex", &color);
+        let color = text_input(color, usage, variant, false);
+
+        let text = widget::text_input("rgb or hex", &text);
+        let text = text_input(text, usage, variant, true);
+
+        column!(color, text).spacing(16.0)
+    }
+
     fn background(&self, theme: &Theme) -> Row<'_, AppMessage> {
         let usage = Usage::Background;
 
         let base = {
             let variant = Variant::Base;
-            let value = match self.pending {
-                Some(Pending {
-                    usage: pending_usage,
-                    variant: pending_variant,
-                    text,
-                }) if usage == pending_usage && variant == pending_variant => self
-                    .custom_input
-                    .clone()
-                    .unwrap_or_else(|| theme_str(theme, usage, variant)),
-                _ => theme_str(theme, usage, variant),
-            };
 
-            let content = widget::text_input("rgb or hex", &value);
-
-            text_input(content, usage, variant, false)
+            self.helper(usage, variant, theme)
         };
 
         let weak = {
             let variant = Variant::Weak;
-            let value = match self.pending {
-                Some(Pending {
-                    usage: pending_usage,
-                    variant: pending_variant,
-                    text,
-                }) if usage == pending_usage && variant == pending_variant => self
-                    .custom_input
-                    .clone()
-                    .unwrap_or_else(|| theme_str(theme, usage, variant)),
-                _ => theme_str(theme, usage, variant),
-            };
 
-            let content = widget::text_input("rgb or hex", &value);
-
-            text_input(content, usage, variant, false)
+            self.helper(usage, variant, theme)
         };
 
         let strong = {
             let variant = Variant::Strong;
-            let value = match self.pending {
-                Some(Pending {
-                    usage: pending_usage,
-                    variant: pending_variant,
-                    text,
-                }) if usage == pending_usage && variant == pending_variant => self
-                    .custom_input
-                    .clone()
-                    .unwrap_or_else(|| theme_str(theme, usage, variant)),
-                _ => theme_str(theme, usage, variant),
-            };
 
-            let content = widget::text_input("rgb or hex", &value);
-
-            text_input(content, usage, variant, false)
+            self.helper(usage, variant, theme)
         };
 
         widget::row!(
@@ -394,59 +408,20 @@ impl App {
 
         let base = {
             let variant = Variant::Base;
-            let value = match self.pending {
-                Some(Pending {
-                    usage: pending_usage,
-                    variant: pending_variant,
-                    text,
-                }) if usage == pending_usage && variant == pending_variant => self
-                    .custom_input
-                    .clone()
-                    .unwrap_or_else(|| theme_str(theme, usage, variant)),
-                _ => theme_str(theme, usage, variant),
-            };
 
-            let content = widget::text_input("rgb or hex", &value);
-
-            text_input(content, usage, variant, false)
+            self.helper(usage, variant, theme)
         };
 
         let weak = {
             let variant = Variant::Weak;
-            let value = match self.pending {
-                Some(Pending {
-                    usage: pending_usage,
-                    variant: pending_variant,
-                    text,
-                }) if usage == pending_usage && variant == pending_variant => self
-                    .custom_input
-                    .clone()
-                    .unwrap_or_else(|| theme_str(theme, usage, variant)),
-                _ => theme_str(theme, usage, variant),
-            };
 
-            let content = widget::text_input("rgb or hex", &value);
-
-            text_input(content, usage, variant, false)
+            self.helper(usage, variant, theme)
         };
 
         let strong = {
             let variant = Variant::Strong;
-            let value = match self.pending {
-                Some(Pending {
-                    usage: pending_usage,
-                    variant: pending_variant,
-                    text,
-                }) if usage == pending_usage && variant == pending_variant => self
-                    .custom_input
-                    .clone()
-                    .unwrap_or_else(|| theme_str(theme, usage, variant)),
-                _ => theme_str(theme, usage, variant),
-            };
 
-            let content = widget::text_input("rgb or hex", &value);
-
-            text_input(content, usage, variant, false)
+            self.helper(usage, variant, theme)
         };
 
         widget::row!(my_text("Primary").width(Length::Fill), base, weak, strong)
@@ -457,59 +432,20 @@ impl App {
 
         let base = {
             let variant = Variant::Base;
-            let value = match self.pending {
-                Some(Pending {
-                    usage: pending_usage,
-                    variant: pending_variant,
-                    text,
-                }) if usage == pending_usage && variant == pending_variant => self
-                    .custom_input
-                    .clone()
-                    .unwrap_or_else(|| theme_str(theme, usage, variant)),
-                _ => theme_str(theme, usage, variant),
-            };
 
-            let content = widget::text_input("rgb or hex", &value);
-
-            text_input(content, usage, variant, false)
+            self.helper(usage, variant, theme)
         };
 
         let weak = {
             let variant = Variant::Weak;
-            let value = match self.pending {
-                Some(Pending {
-                    usage: pending_usage,
-                    variant: pending_variant,
-                    text,
-                }) if usage == pending_usage && variant == pending_variant => self
-                    .custom_input
-                    .clone()
-                    .unwrap_or_else(|| theme_str(theme, usage, variant)),
-                _ => theme_str(theme, usage, variant),
-            };
 
-            let content = widget::text_input("rgb or hex", &value);
-
-            text_input(content, usage, variant, false)
+            self.helper(usage, variant, theme)
         };
 
         let strong = {
             let variant = Variant::Strong;
-            let value = match self.pending {
-                Some(Pending {
-                    usage: pending_usage,
-                    variant: pending_variant,
-                    text,
-                }) if usage == pending_usage && variant == pending_variant => self
-                    .custom_input
-                    .clone()
-                    .unwrap_or_else(|| theme_str(theme, usage, variant)),
-                _ => theme_str(theme, usage, variant),
-            };
 
-            let content = widget::text_input("rgb or hex", &value);
-
-            text_input(content, usage, variant, false)
+            self.helper(usage, variant, theme)
         };
 
         widget::row!(my_text("Secondary").width(Length::Fill), base, weak, strong)
@@ -520,59 +456,20 @@ impl App {
 
         let base = {
             let variant = Variant::Base;
-            let value = match self.pending {
-                Some(Pending {
-                    usage: pending_usage,
-                    variant: pending_variant,
-                    text,
-                }) if usage == pending_usage && variant == pending_variant => self
-                    .custom_input
-                    .clone()
-                    .unwrap_or_else(|| theme_str(theme, usage, variant)),
-                _ => theme_str(theme, usage, variant),
-            };
 
-            let content = widget::text_input("rgb or hex", &value);
-
-            text_input(content, usage, variant, false)
+            self.helper(usage, variant, theme)
         };
 
         let weak = {
             let variant = Variant::Weak;
-            let value = match self.pending {
-                Some(Pending {
-                    usage: pending_usage,
-                    variant: pending_variant,
-                    text,
-                }) if usage == pending_usage && variant == pending_variant => self
-                    .custom_input
-                    .clone()
-                    .unwrap_or_else(|| theme_str(theme, usage, variant)),
-                _ => theme_str(theme, usage, variant),
-            };
 
-            let content = widget::text_input("rgb or hex", &value);
-
-            text_input(content, usage, variant, false)
+            self.helper(usage, variant, theme)
         };
 
         let strong = {
             let variant = Variant::Strong;
-            let value = match self.pending {
-                Some(Pending {
-                    usage: pending_usage,
-                    variant: pending_variant,
-                    text,
-                }) if usage == pending_usage && variant == pending_variant => self
-                    .custom_input
-                    .clone()
-                    .unwrap_or_else(|| theme_str(theme, usage, variant)),
-                _ => theme_str(theme, usage, variant),
-            };
 
-            let content = widget::text_input("rgb or hex", &value);
-
-            text_input(content, usage, variant, false)
+            self.helper(usage, variant, theme)
         };
 
         widget::row!(my_text("Success").width(Length::Fill), base, weak, strong)
@@ -583,59 +480,20 @@ impl App {
 
         let base = {
             let variant = Variant::Base;
-            let value = match self.pending {
-                Some(Pending {
-                    usage: pending_usage,
-                    variant: pending_variant,
-                    text,
-                }) if usage == pending_usage && variant == pending_variant => self
-                    .custom_input
-                    .clone()
-                    .unwrap_or_else(|| theme_str(theme, usage, variant)),
-                _ => theme_str(theme, usage, variant),
-            };
 
-            let content = widget::text_input("rgb or hex", &value);
-
-            text_input(content, usage, variant, false)
+            self.helper(usage, variant, theme)
         };
 
         let weak = {
             let variant = Variant::Weak;
-            let value = match self.pending {
-                Some(Pending {
-                    usage: pending_usage,
-                    variant: pending_variant,
-                    text,
-                }) if usage == pending_usage && variant == pending_variant => self
-                    .custom_input
-                    .clone()
-                    .unwrap_or_else(|| theme_str(theme, usage, variant)),
-                _ => theme_str(theme, usage, variant),
-            };
 
-            let content = widget::text_input("rgb or hex", &value);
-
-            text_input(content, usage, variant, false)
+            self.helper(usage, variant, theme)
         };
 
         let strong = {
             let variant = Variant::Strong;
-            let value = match self.pending {
-                Some(Pending {
-                    usage: pending_usage,
-                    variant: pending_variant,
-                    text,
-                }) if usage == pending_usage && variant == pending_variant => self
-                    .custom_input
-                    .clone()
-                    .unwrap_or_else(|| theme_str(theme, usage, variant)),
-                _ => theme_str(theme, usage, variant),
-            };
 
-            let content = widget::text_input("rgb or hex", &value);
-
-            text_input(content, usage, variant, false)
+            self.helper(usage, variant, theme)
         };
 
         widget::row!(my_text("Danger").width(Length::Fill), base, weak, strong)
@@ -646,7 +504,7 @@ fn main() -> iced::Result {
     iced::application(App::boot, App::update, App::view)
         .title("Theme Viewer")
         .antialiasing(true)
-        .window_size((720.0, 720.0))
+        .window_size((850.0, 850.0))
         .resizable(false)
         .theme(theme)
         .subscription(App::subscription)
@@ -678,7 +536,7 @@ fn text_input(
         .style(move |theme, status| text_input_style(theme, status, usage, variant))
 }
 
-fn convert_color_str(input: &str) -> Option<Pair> {
+fn convert_color_str(input: &str, prev: Pair, text_color: bool) -> Option<Pair> {
     if input.is_empty() {
         return None;
     }
@@ -716,7 +574,14 @@ fn convert_color_str(input: &str) -> Option<Pair> {
         color!(235, 235, 235)
     };
 
-    Some(Pair::new(color, text))
+    if text_color {
+        Some(Pair {
+            color: prev.color,
+            text: color,
+        })
+    } else {
+        Some(Pair::new(color, text))
+    }
 }
 
 fn text_input_style(
@@ -785,14 +650,24 @@ fn get_pair(theme: &Theme, usage: Usage, variant: Variant) -> Pair {
     }
 }
 
-fn theme_str(theme: &Theme, usage: Usage, variant: Variant) -> String {
-    let color = get_pair(theme, usage, variant).color;
+fn theme_str(theme: &Theme, usage: Usage, variant: Variant) -> (String, String) {
+    let pair = get_pair(theme, usage, variant);
+    let color = pair.color;
+    let text = pair.text;
 
-    format!(
-        "rgb({:.0}, {:.0}, {:.0})",
-        color.r * 255.0,
-        color.g * 255.0,
-        color.b * 255.0
+    (
+        format!(
+            "rgb({:.0}, {:.0}, {:.0})",
+            color.r * 255.0,
+            color.g * 255.0,
+            color.b * 255.0
+        ),
+        format!(
+            "rgb({:.0}, {:.0}, {:.0})",
+            text.r * 255.0,
+            text.g * 255.0,
+            text.b * 255.0
+        ),
     )
 }
 
