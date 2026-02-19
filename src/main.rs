@@ -1,6 +1,6 @@
 use iced::{
     Background, Border, Color, Length, Task, Theme,
-    alignment::{Horizontal, Vertical},
+    alignment::Vertical,
     color,
     theme::{
         self,
@@ -53,7 +53,11 @@ struct Pending {
 enum Variant {
     Base,
     Weak,
+    Weaker,
+    Weakest,
     Strong,
+    Stronger,
+    Strongest,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -216,7 +220,11 @@ impl App {
         let pair = match (usage, variant) {
             (Usage::Background, Variant::Base) => ext.background.base,
             (Usage::Background, Variant::Weak) => ext.background.weak,
+            (Usage::Background, Variant::Weaker) => ext.background.weaker,
+            (Usage::Background, Variant::Weakest) => ext.background.weakest,
             (Usage::Background, Variant::Strong) => ext.background.strong,
+            (Usage::Background, Variant::Stronger) => ext.background.stronger,
+            (Usage::Background, Variant::Strongest) => ext.background.strongest,
 
             (Usage::Primary, Variant::Base) => ext.primary.base,
             (Usage::Primary, Variant::Weak) => ext.primary.weak,
@@ -233,6 +241,8 @@ impl App {
             (Usage::Danger, Variant::Base) => ext.danger.base,
             (Usage::Danger, Variant::Weak) => ext.danger.weak,
             (Usage::Danger, Variant::Strong) => ext.danger.strong,
+
+            _ => unreachable!(),
         };
 
         let Some(pair) = convert_color_str(&input, pair, text) else {
@@ -278,13 +288,21 @@ impl App {
         let spacing = 16.0;
 
         let labels = widget::row!(
-            space::horizontal().width(450),
+            space::horizontal().width(175),
             my_text("Base"),
-            space::horizontal().width(145),
+            space::horizontal().width(150),
             my_text("Weak"),
-            space::horizontal().width(135),
+            space::horizontal().width(140),
             my_text("Strong"),
-            space::horizontal().width(155),
+            space::horizontal().width(135),
+            my_text("Weaker"),
+            space::horizontal().width(125),
+            my_text("Weakest"),
+            space::horizontal().width(125),
+            my_text("Stronger"),
+            space::horizontal().width(125),
+            my_text("Strongest"),
+            space::horizontal().width(150),
         )
         .align_y(Vertical::Center)
         .spacing(0);
@@ -333,20 +351,21 @@ impl App {
 
         let print = widget::button("Print").on_press(AppMessage::Print);
 
-        let actions = widget::row!(reset, save, print)
+        let actions = widget::row!(space::horizontal(), reset, save, print, space::horizontal())
             .spacing(40)
             .align_y(iced::alignment::Vertical::Center);
 
-        widget::column![
-            header,
-            theme_selector,
-            content,
-            space::vertical().height(25.0),
-            actions
-        ]
-        .align_x(Horizontal::Center)
-        .spacing(spacing)
-        .padding(16.0)
+        widget::scrollable(
+            widget::column![
+                header,
+                theme_selector,
+                content,
+                space::vertical().height(25.0),
+                actions
+            ]
+            .spacing(spacing)
+            .padding(16.0),
+        )
         .into()
     }
 
@@ -397,17 +416,45 @@ impl App {
             self.helper(usage, variant, theme)
         };
 
+        let weaker = {
+            let variant = Variant::Weaker;
+
+            self.helper(usage, variant, theme)
+        };
+
+        let weakest = {
+            let variant = Variant::Weakest;
+
+            self.helper(usage, variant, theme)
+        };
+
         let strong = {
             let variant = Variant::Strong;
 
             self.helper(usage, variant, theme)
         };
 
+        let stronger = {
+            let variant = Variant::Stronger;
+
+            self.helper(usage, variant, theme)
+        };
+
+        let strongest = {
+            let variant = Variant::Strongest;
+
+            self.helper(usage, variant, theme)
+        };
+
         widget::row!(
-            my_text("Background").width(Length::Fill),
+            my_text("Background").width(150),
             base,
             weak,
-            strong
+            strong,
+            weaker,
+            weakest,
+            stronger,
+            strongest,
         )
     }
 
@@ -432,7 +479,7 @@ impl App {
             self.helper(usage, variant, theme)
         };
 
-        widget::row!(my_text("Primary").width(Length::Fill), base, weak, strong)
+        widget::row!(my_text("Primary").width(150), base, weak, strong)
     }
 
     fn secondary(&self, theme: &Theme) -> Row<'_, AppMessage> {
@@ -456,7 +503,7 @@ impl App {
             self.helper(usage, variant, theme)
         };
 
-        widget::row!(my_text("Secondary").width(Length::Fill), base, weak, strong)
+        widget::row!(my_text("Secondary").width(150), base, weak, strong)
     }
 
     fn success(&self, theme: &Theme) -> Row<'_, AppMessage> {
@@ -480,7 +527,7 @@ impl App {
             self.helper(usage, variant, theme)
         };
 
-        widget::row!(my_text("Success").width(Length::Fill), base, weak, strong)
+        widget::row!(my_text("Success").width(150), base, weak, strong)
     }
 
     fn danger(&self, theme: &Theme) -> Row<'_, AppMessage> {
@@ -504,7 +551,7 @@ impl App {
             self.helper(usage, variant, theme)
         };
 
-        widget::row!(my_text("Danger").width(Length::Fill), base, weak, strong)
+        widget::row!(my_text("Danger").width(150), base, weak, strong)
     }
 }
 
@@ -512,8 +559,7 @@ fn main() -> iced::Result {
     iced::application(App::boot, App::update, App::view)
         .title("Theme Viewer")
         .antialiasing(true)
-        .window_size((1000.0, 900.0))
-        .resizable(false)
+        .window_size((1500.0, 900.0))
         .theme(theme)
         .subscription(App::subscription)
         .run()
@@ -621,6 +667,7 @@ fn get_pair(theme: &Theme, usage: Usage, variant: Variant) -> Pair {
                 Variant::Base => primary.base,
                 Variant::Weak => primary.weak,
                 Variant::Strong => primary.strong,
+                _ => unreachable!(),
             }
         }
         Usage::Secondary => {
@@ -629,6 +676,7 @@ fn get_pair(theme: &Theme, usage: Usage, variant: Variant) -> Pair {
                 Variant::Base => secondary.base,
                 Variant::Weak => secondary.weak,
                 Variant::Strong => secondary.strong,
+                _ => unreachable!(),
             }
         }
         Usage::Background => {
@@ -636,7 +684,11 @@ fn get_pair(theme: &Theme, usage: Usage, variant: Variant) -> Pair {
             match variant {
                 Variant::Base => background.base,
                 Variant::Weak => background.weak,
+                Variant::Weaker => background.weaker,
+                Variant::Weakest => background.weakest,
                 Variant::Strong => background.strong,
+                Variant::Stronger => background.stronger,
+                Variant::Strongest => background.strongest,
             }
         }
         Usage::Danger => {
@@ -645,6 +697,7 @@ fn get_pair(theme: &Theme, usage: Usage, variant: Variant) -> Pair {
                 Variant::Base => danger.base,
                 Variant::Weak => danger.weak,
                 Variant::Strong => danger.strong,
+                _ => unreachable!(),
             }
         }
         Usage::Success => {
@@ -653,6 +706,7 @@ fn get_pair(theme: &Theme, usage: Usage, variant: Variant) -> Pair {
                 Variant::Base => success.base,
                 Variant::Weak => success.weak,
                 Variant::Strong => success.strong,
+                _ => unreachable!(),
             }
         }
     }
@@ -697,6 +751,7 @@ fn updated_extended(extended: Extended, pair: Pair, usage: Usage, variant: Varia
                     strong: pair,
                     ..extended.primary
                 },
+                _ => unreachable!(),
             };
 
             Extended {
@@ -719,6 +774,7 @@ fn updated_extended(extended: Extended, pair: Pair, usage: Usage, variant: Varia
                     strong: pair,
                     ..extended.secondary
                 },
+                _ => unreachable!(),
             };
 
             Extended {
@@ -737,8 +793,24 @@ fn updated_extended(extended: Extended, pair: Pair, usage: Usage, variant: Varia
                     weak: pair,
                     ..extended.background
                 },
+                Variant::Weaker => Background {
+                    weaker: pair,
+                    ..extended.background
+                },
+                Variant::Weakest => Background {
+                    weakest: pair,
+                    ..extended.background
+                },
                 Variant::Strong => Background {
                     strong: pair,
+                    ..extended.background
+                },
+                Variant::Stronger => Background {
+                    stronger: pair,
+                    ..extended.background
+                },
+                Variant::Strongest => Background {
+                    strongest: pair,
                     ..extended.background
                 },
             };
@@ -763,6 +835,7 @@ fn updated_extended(extended: Extended, pair: Pair, usage: Usage, variant: Varia
                     strong: pair,
                     ..extended.success
                 },
+                _ => unreachable!(),
             };
 
             Extended {
@@ -785,6 +858,7 @@ fn updated_extended(extended: Extended, pair: Pair, usage: Usage, variant: Varia
                     strong: pair,
                     ..extended.danger
                 },
+                _ => unreachable!(),
             };
 
             Extended { danger, ..extended }
