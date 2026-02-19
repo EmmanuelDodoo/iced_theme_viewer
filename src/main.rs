@@ -67,6 +67,7 @@ enum Usage {
     Background,
     Success,
     Danger,
+    Warning,
 }
 
 fn all_themes() -> Vec<Theme> {
@@ -242,6 +243,10 @@ impl App {
             (Usage::Danger, Variant::Weak) => ext.danger.weak,
             (Usage::Danger, Variant::Strong) => ext.danger.strong,
 
+            (Usage::Warning, Variant::Base) => ext.warning.base,
+            (Usage::Warning, Variant::Weak) => ext.warning.weak,
+            (Usage::Warning, Variant::Strong) => ext.warning.strong,
+
             _ => unreachable!(),
         };
 
@@ -332,12 +337,18 @@ impl App {
             .spacing(spacing)
             .align_y(Vertical::Center);
 
+        let warning_row = self
+            .warning(theme)
+            .spacing(spacing)
+            .align_y(Vertical::Center);
+
         let colors = widget::column!(
             background_row,
             primary_row,
             secondary_row,
             success_row,
-            danger_row
+            danger_row,
+            warning_row,
         )
         .spacing(24.0);
 
@@ -553,6 +564,30 @@ impl App {
 
         widget::row!(my_text("Danger").width(150), base, weak, strong)
     }
+
+    fn warning(&self, theme: &Theme) -> Row<'_, AppMessage> {
+        let usage = Usage::Warning;
+
+        let base = {
+            let variant = Variant::Base;
+
+            self.helper(usage, variant, theme)
+        };
+
+        let weak = {
+            let variant = Variant::Weak;
+
+            self.helper(usage, variant, theme)
+        };
+
+        let strong = {
+            let variant = Variant::Strong;
+
+            self.helper(usage, variant, theme)
+        };
+
+        widget::row!(my_text("Warning").width(150), base, weak, strong)
+    }
 }
 
 fn main() -> iced::Result {
@@ -709,6 +744,16 @@ fn get_pair(theme: &Theme, usage: Usage, variant: Variant) -> Pair {
                 _ => unreachable!(),
             }
         }
+        Usage::Warning => {
+            let warn = palette.warning;
+
+            match variant {
+                Variant::Base => warn.base,
+                Variant::Weak => warn.weak,
+                Variant::Strong => warn.strong,
+                _ => unreachable!(),
+            }
+        }
     }
 }
 
@@ -734,7 +779,7 @@ fn theme_str(theme: &Theme, usage: Usage, variant: Variant) -> (String, String) 
 }
 
 fn updated_extended(extended: Extended, pair: Pair, usage: Usage, variant: Variant) -> Extended {
-    use palette::{Background, Danger, Primary, Secondary, Success};
+    use palette::{Background, Danger, Primary, Secondary, Success, Warning};
 
     match usage {
         Usage::Primary => {
@@ -862,6 +907,29 @@ fn updated_extended(extended: Extended, pair: Pair, usage: Usage, variant: Varia
             };
 
             Extended { danger, ..extended }
+        }
+
+        Usage::Warning => {
+            let warning = match variant {
+                Variant::Base => Warning {
+                    base: pair,
+                    ..extended.warning
+                },
+                Variant::Weak => Warning {
+                    weak: pair,
+                    ..extended.warning
+                },
+                Variant::Strong => Warning {
+                    strong: pair,
+                    ..extended.warning
+                },
+                _ => unreachable!(),
+            };
+
+            Extended {
+                warning,
+                ..extended
+            }
         }
     }
 }
